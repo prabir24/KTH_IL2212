@@ -9,7 +9,6 @@
 #define TRUE 1
 #define PERFORMANCE_COUNT 32
 
-/* Global Variable for no of iterations */
 unsigned char count;
 
 int main()
@@ -22,38 +21,11 @@ int main()
 #ifdef PERFORMANCE
 	count = PERFORMANCE_COUNT;
 #endif
-	/* get the mutex device handle */
-	mutex0 = altera_avalon_mutex_open( "/dev/mutex_0" );
-	mutex1 = altera_avalon_mutex_open( "/dev/mutex_1" );
-	mutex2 = altera_avalon_mutex_open( "/dev/mutex_2" );
-	mutex3 = altera_avalon_mutex_open( "/dev/mutex_3" );
-	mutex4 = altera_avalon_mutex_open( "/dev/mutex_4" );
-
-	/* acquire the mutex, setting the value to one */
-	altera_avalon_mutex_lock( mutex0, 1 );
-	altera_avalon_mutex_lock( mutex1, 1 );
-	altera_avalon_mutex_lock( mutex2, 1 );
-	altera_avalon_mutex_lock( mutex3, 1 );
-	altera_avalon_mutex_lock( mutex4, 1 );
-
-	/* Memory allocated for CPU_1 to CPU_4 in Shared Memory for status*/ 
-	statusMem((unsigned char*)SHARED_ONCHIP_BASE);
-
-	/*memory location for image on shared on-chip memory*/
-
-	unsigned char* image_loc;
-	image_loc = (unsigned char*)SHARED_ONCHIP_BASE;
-
-	unsigned char* grayscale_image_loc = image_loc+5000;
-	unsigned char* resize_image_loc = image_loc;
-	unsigned char* brightness_loc = image_loc+4000;
-	unsigned char* correctness_image_loc = image_loc+5000;
-
-	unsigned char* sobelFilter_image_loc = image_loc;
-	unsigned char* asciiArt_loc = image_loc+5000;
-
+	
 	/* local variable */
 	short temp_1 = 0, temp_2;
+	unsigned char b_value[2];
+	unsigned char *dest_image = NULL;
 #ifdef DEBUG
 	short temp_3;
 	short length, lengthX;
@@ -64,23 +36,12 @@ int main()
 	unsigned int throughput;
 #endif
 
-	/* Location in shared memory for inter Processor Communication */
-	memory4Sharing(image_loc);
-
-	/* Updating No. of iterations in shared memory that is to be read by CPU_1 to CPU_4 */ 
-	iterations(count*sequence1_length);
-
-	firstExecution = TRUE;
-
-	/* wait for all processors to be synced */
-	while(readStatus() == 0);
-
 	/********************************************************************************/
 	/********************** PERFORMANCE COUNTER INITIALIZATION **********************/
 	/********************************************************************************/
 	
 #ifdef PERFORMANCE
-
+	
 	PERF_START_MEASURING(PERFORMANCE_COUNTER_0_BASE);
 
 	int timer_overhead_perf = 0;
@@ -100,7 +61,7 @@ int main()
 
 	PERF_RESET(PERFORMANCE_COUNTER_0_BASE);	
 	PERF_START_MEASURING(PERFORMANCE_COUNTER_0_BASE);
-
+	
 	PERF_BEGIN(PERFORMANCE_COUNTER_0_BASE,1);
 #endif
 
@@ -111,38 +72,42 @@ int main()
 	{
 		for(temp_2 = 0; temp_2 < sequence1_length; temp_2++)
 		{
-			/* copy image to shared on-chip memory */
-			copyImage((unsigned int*)(*(sequence1+temp_2)), (unsigned int*)image_loc);	
-
+			if(*sequence1[temp_2] != 32 || *(sequence1[temp_2]+1) != 32)
+			{
+				printf("Image is not 32*32 size\n");
+				continue;
+			}
 			/* convert 32 * 32 24-bit image to grayscale image */ 
-			grayscale(image_loc, grayscale_image_loc);
+			dest_image = grayscale(sequence1[temp_2]);
 
 			/* resize 32 * 32 image to 16*16 image */
-			resize(grayscale_image_loc, resize_image_loc);
-
+			resize(dest_image, b_value);
+			
 			/* correct the pixel values based on the difference between max and min of image */
-			correctness(resize_image_loc, correctness_image_loc, brightness_loc);
-	
+			correctness(dest_image, b_value);
+			
 			/* sobel-filter implementation */
-			sobelFilter(correctness_image_loc, sobelFilter_image_loc);
+			sobelFilter(dest_image);
 
 			/*convert 256-values pixel to 16-values ascii characters */
-			toAsciiArt(sobelFilter_image_loc, asciiArt_loc);
-
+			toAsciiArt(dest_image);
 #ifdef DEBUG
 			
-			printf("\n ******Output Image****** \n");
-			length = asciiArt_loc[0] * asciiArt_loc[1];
-			lengthX = asciiArt_loc[0];
-			asciiArt_loc = asciiArt_loc + 3;
+			printf("\n\n ******Output Image****** \n");
+			length = dest_image[0] * dest_image[1];
+			lengthX = dest_image[0];
+			dest_image = dest_image + 3;
 
 			for(temp_3 = 0; temp_3 < length; temp_3++)
 			{
 				if((temp_3 % lengthX) == 0)
 					printf("\n");
-				printf("%c",asciiArt_loc[temp_3]);
+				printf("%c",dest_image[temp_3]);
 			}
 #endif
+			dest_image = dest_image - 3;
+			free(dest_image);
+			dest_image = NULL;
 		}
 	}
 

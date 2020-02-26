@@ -2,6 +2,8 @@
 
 char asciiLevels[16] = {' ','.',':','-','=','+','/','t','z','U','w','*','0','#','%','@'};
 
+unsigned int img_offset = 0;
+
 /*Specific location on shared on-chip memory for different processors */
 void memory4Sharing(unsigned char* image_loc)
 {
@@ -57,13 +59,16 @@ unsigned char readStatus()
 		return 0;
 }
 
-void copyImage(unsigned char* src_image, unsigned char* dest_image)
+void copyImage(unsigned int* src_image, unsigned int* dest_image)
 {
-	short temp_1 = 0;
-	short length = (src_image[0] * src_image[1] * 3) + 3;
+	short temp_1 = 0, length;
+	unsigned int tmp_img_addr = src_image;
+
+	img_offset = tmp_img_addr & 0x3;
+	length = (((*((unsigned char*)src_image)) * (*((unsigned char*)src_image+1)) * 3) + 4) >> 2;
 		
-	for(temp_1 = 0; temp_1 < length; temp_1++)
-		dest_image[temp_1] = src_image[temp_1];	
+	for(temp_1 = 0; temp_1 < length; temp_1++) 
+		dest_image[temp_1] = src_image[temp_1];
 }
 
 unsigned char checkMutexStatus()
@@ -95,6 +100,8 @@ void grayscale(unsigned char* src_image, unsigned char* dest_image)
 	unsigned char temp_1 = 0, temp_3 = 0;
 	short temp_2 = 0;
 	short length, length1 ;
+
+	src_image = src_image + img_offset;
 	
 	temp_3 = 7;//(src_image[0] / 5) + 1;
 	length = (src_image[0] - (temp_3 << 2)) << 5;//* src_image[1];

@@ -45,7 +45,7 @@ void statusMem(unsigned char* image_loc);
 unsigned char readStatus();
 void iterations(unsigned char val);
 
-void copyImage(unsigned char* src_image, unsigned char* dest_image);
+void copyImage(unsigned int* src_image, unsigned int* dest_image);
 
 void grayscale(unsigned char* src_image, unsigned char* dest_image);
 void resize(unsigned char* src_image, unsigned char* dest_image);
